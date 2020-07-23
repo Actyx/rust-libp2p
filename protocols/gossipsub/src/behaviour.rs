@@ -128,10 +128,10 @@ impl Gossipsub {
     ///
     /// Returns true if the subscription worked. Returns false if we were already subscribed.
     pub fn subscribe(&mut self, topic: Topic) -> bool {
-        debug!("Subscribing to topic: {}", topic);
+        println!("XXXX Subscribing to topic: {}", topic);
         let topic_hash = self.topic_hash(topic.clone());
         if self.mesh.get(&topic_hash).is_some() {
-            debug!("Topic: {} is already in the mesh.", topic);
+            println!("XXXX Topic: {} is already in the mesh.", topic);
             return false;
         }
 

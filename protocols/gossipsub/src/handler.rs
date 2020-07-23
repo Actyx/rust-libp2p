@@ -178,6 +178,7 @@ impl ProtocolsHandler for GossipsubHandler {
         if !self.send_queue.is_empty() && self.outbound_substream.is_none() {
             let message = self.send_queue.remove(0);
             self.send_queue.shrink_to_fit();
+            println!("XXXX send {:?}", message);
             return Poll::Ready(ProtocolsHandlerEvent::OutboundSubstreamRequest {
                 protocol: self.listen_protocol.clone(),
                 info: message,
@@ -195,6 +196,7 @@ impl ProtocolsHandler for GossipsubHandler {
                         Poll::Ready(Some(Ok(message))) => {
                             self.inbound_substream =
                                 Some(InboundSubstreamState::WaitingInput(substream));
+                            println!("XXXX recv {:?}", message);
                             return Poll::Ready(ProtocolsHandlerEvent::Custom(message));
                         }
                         Poll::Ready(Some(Err(e))) => {
