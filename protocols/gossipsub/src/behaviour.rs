@@ -124,6 +124,25 @@ impl Gossipsub {
         }
     }
 
+    pub fn resubscribe(&mut self) {
+        println!("XXXX resubscribe {:?}", self.peer_topics);
+        for (peer, topic_hashes) in &self.peer_topics {
+            let msg = GossipsubRpc {
+                messages: Vec::new(),
+                subscriptions: topic_hashes.into_iter().map(|topic_hash| GossipsubSubscription {
+                    topic_hash: topic_hash.clone(),
+                    action: GossipsubSubscriptionAction::Subscribe,
+                }).collect(),
+                control_msgs: Vec::new(),
+            };
+            self.events.push_back(NetworkBehaviourAction::NotifyHandler {
+                peer_id: peer.clone(),
+                handler: NotifyHandler::Any,
+                event: Arc::new(msg),
+            });
+        }
+    }
+
     /// Subscribe to a topic.
     ///
     /// Returns true if the subscription worked. Returns false if we were already subscribed.
@@ -396,13 +415,13 @@ impl Gossipsub {
 
     /// Gossipsub LEAVE(topic) - Notifies mesh\[topic\] peers with PRUNE messages.
     fn leave(&mut self, topic_hash: &TopicHash) {
-        debug!("Running LEAVE for topic {:?}", topic_hash);
+        println!("XXXX Running LEAVE for topic {:?}", topic_hash);
 
         // if our mesh contains the topic, send prune to peers and delete it from the mesh
         if let Some((_, peers)) = self.mesh.remove_entry(topic_hash) {
             for peer in peers {
                 // Send a PRUNE control message
-                info!("LEAVE: Sending PRUNE to peer: {:?}", peer);
+                println!("XXXX LEAVE: Sending PRUNE to peer: {:?}", peer);
                 Self::control_pool_add(
                     &mut self.control_pool,
                     peer.clone(),
@@ -412,7 +431,7 @@ impl Gossipsub {
                 );
             }
         }
-        debug!("Completed LEAVE for topic: {:?}", topic_hash);
+        println!("XXXX Completed LEAVE for topic: {:?}", topic_hash);
     }
 
     /// Handles an IHAVE control message. Checks our cache of messages. If the message is unknown,
@@ -552,6 +571,7 @@ impl Gossipsub {
     /// Handles a newly received GossipsubMessage.
     /// Forwards the message to all peers in the mesh.
     fn handle_received_message(&mut self, msg: GossipsubMessage, propagation_source: &PeerId) {
+        println!("XXXX handle_received_message");
         let msg_id = (self.config.message_id_fn)(&msg);
         debug!(
             "Handling message: {:?} from peer: {:?}",
@@ -565,9 +585,10 @@ impl Gossipsub {
         // add to the memcache
         self.mcache.put(msg.clone());
 
+        println!("XXXX mesh keys {:?} message {:?}", self.mesh.keys(), msg.topics);
         // dispatch the message to the user
         if self.mesh.keys().any(|t| msg.topics.iter().any(|u| t == u)) {
-            debug!("Sending received message to user");
+            println!("XXXX Sending received message to user");
             self.events.push_back(NetworkBehaviourAction::GenerateEvent(
                 GossipsubEvent::Message(propagation_source.clone(), msg_id, msg.clone()),
             ));
@@ -577,7 +598,7 @@ impl Gossipsub {
         if !self.config.manual_propagation {
             let message_id = (self.config.message_id_fn)(&msg);
             self.forward_msg(msg, propagation_source);
-            debug!("Completed message handling for message: {:?}", message_id);
+            println!("XXXX Completed message handling for message: {:?}", message_id);
         }
     }
 
@@ -587,14 +608,14 @@ impl Gossipsub {
         subscriptions: &[GossipsubSubscription],
         propagation_source: &PeerId,
     ) {
-        debug!(
-            "Handling subscriptions: {:?}, from source: {:?}",
+        println!(
+            "XXXX Handling subscriptions: {:?}, from source: {:?}",
             subscriptions, propagation_source
         );
         let subscribed_topics = match self.peer_topics.get_mut(propagation_source) {
             Some(topics) => topics,
             None => {
-                error!("Subscription by unknown peer: {:?}", &propagation_source);
+                println!("XXXX ERROR Subscription by unknown peer: {:?}", &propagation_source);
                 return;
             }
         };
@@ -609,8 +630,8 @@ impl Gossipsub {
             match subscription.action {
                 GossipsubSubscriptionAction::Subscribe => {
                     if !peer_list.contains(&propagation_source) {
-                        debug!(
-                            "SUBSCRIPTION: topic_peer: Adding gossip peer: {:?} to topic: {:?}",
+                        println!(
+                            "XXXX SUBSCRIPTION: topic_peer: Adding gossip peer: {:?} to topic: {:?}",
                             propagation_source, subscription.topic_hash
                         );
                         peer_list.push(propagation_source.clone());
@@ -618,8 +639,8 @@ impl Gossipsub {
 
                     // add to the peer_topics mapping
                     if !subscribed_topics.contains(&subscription.topic_hash) {
-                        info!(
-                            "SUBSCRIPTION: Adding peer: {:?} to topic: {:?}",
+                        println!(
+                            "XXXX SUBSCRIPTION: Adding peer: {:?} to topic: {:?}",
                             propagation_source, subscription.topic_hash
                         );
                         subscribed_topics.push(subscription.topic_hash.clone());
@@ -628,8 +649,8 @@ impl Gossipsub {
                     // if the mesh needs peers add the peer to the mesh
                     if let Some(peers) = self.mesh.get_mut(&subscription.topic_hash) {
                         if peers.len() < self.config.mesh_n_low {
-                            debug!(
-                                "SUBSCRIPTION: Adding peer {:?} to the mesh",
+                            println!(
+                                "XXXX SUBSCRIPTION: Adding peer {:?} to the mesh",
                                 propagation_source,
                             );
                         }
@@ -645,8 +666,8 @@ impl Gossipsub {
                 }
                 GossipsubSubscriptionAction::Unsubscribe => {
                     if let Some(pos) = peer_list.iter().position(|p| p == propagation_source) {
-                        info!(
-                            "SUBSCRIPTION: Removing gossip peer: {:?} from topic: {:?}",
+                        println!(
+                            "XXXX SUBSCRIPTION: Removing gossip peer: {:?} from topic: {:?}",
                             propagation_source, subscription.topic_hash
                         );
                         peer_list.remove(pos);
@@ -690,8 +711,8 @@ impl Gossipsub {
         for (topic_hash, peers) in self.mesh.iter_mut() {
             // too little peers - add some
             if peers.len() < self.config.mesh_n_low {
-                debug!(
-                    "HEARTBEAT: Mesh low. Topic: {:?} Contains: {:?} needs: {:?}",
+                println!(
+                    "XXXX HEARTBEAT: Mesh low. Topic: {:?} Contains: {:?} needs: {:?}",
                     topic_hash.clone().into_string(),
                     peers.len(),
                     self.config.mesh_n_low
@@ -707,14 +728,13 @@ impl Gossipsub {
                     current_topic.push(topic_hash.clone());
                 }
                 // update the mesh
-                debug!("Updating mesh, new mesh: {:?}", peer_list);
+                println!("XXXX Updating mesh, new mesh: {:?}", peer_list);
                 peers.extend(peer_list);
             }
 
             // too many peers - remove some
             if peers.len() > self.config.mesh_n_high {
-                debug!(
-                    "HEARTBEAT: Mesh high. Topic: {:?} Contains: {:?} needs: {:?}",
+                println!("XXXX HEARTBEAT: Mesh high. Topic: {:?} Contains: {:?} needs: {:?}",
                     topic_hash,
                     peers.len(),
                     self.config.mesh_n_high
@@ -1093,6 +1113,7 @@ impl NetworkBehaviour for Gossipsub {
     }
 
     fn inject_event(&mut self, propagation_source: PeerId, _: ConnectionId, event: GossipsubRpc) {
+        println!("XXXX inject_event");
         // Handle subscriptions
         // Update connected peers topics
         self.handle_received_subscriptions(&event.subscriptions, &propagation_source);

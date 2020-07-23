@@ -258,6 +258,7 @@ impl ProtocolsHandler for GossipsubHandler {
                 Some(OutboundSubstreamState::WaitingOutput(substream)) => {
                     if !self.send_queue.is_empty() {
                         let message = self.send_queue.remove(0);
+                        println!("XXXX send {:?}", message);
                         self.send_queue.shrink_to_fit();
                         self.outbound_substream =
                             Some(OutboundSubstreamState::PendingSend(substream, message));
