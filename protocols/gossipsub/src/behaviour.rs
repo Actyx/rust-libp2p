@@ -134,6 +134,7 @@ impl Gossipsub {
             println!("XXXX Topic: {} is already in the mesh.", topic);
             return false;
         }
+        println!("XXXX Topic: {} is not yet in the mesh.", topic);
 
         // send subscription request to all peers in the topic
         if let Some(peer_list) = self.topic_peers.get(&topic_hash) {
@@ -326,11 +327,11 @@ impl Gossipsub {
 
     /// Gossipsub JOIN(topic) - adds topic peers to mesh and sends them GRAFT messages.
     fn join(&mut self, topic_hash: &TopicHash) {
-        debug!("Running JOIN for topic: {:?}", topic_hash);
+        println!("XXXX Running JOIN for topic: {:?}", topic_hash);
 
         // if we are already in the mesh, return
         if self.mesh.contains_key(topic_hash) {
-            info!("JOIN: The topic is already in the mesh, ignoring JOIN");
+            println!("XXXX JOIN: The topic is already in the mesh, ignoring JOIN");
             return;
         }
 
@@ -339,15 +340,15 @@ impl Gossipsub {
         // check if we have mesh_n peers in fanout[topic] and add them to the mesh if we do,
         // removing the fanout entry.
         if let Some((_, peers)) = self.fanout.remove_entry(topic_hash) {
-            debug!(
-                "JOIN: Removing peers from the fanout for topic: {:?}",
+            println!(
+                "XXXX JOIN: Removing peers from the fanout for topic: {:?}",
                 topic_hash
             );
             // add up to mesh_n of them them to the mesh
             // Note: These aren't randomly added, currently FIFO
             let add_peers = std::cmp::min(peers.len(), self.config.mesh_n);
-            debug!(
-                "JOIN: Adding {:?} peers from the fanout for topic: {:?}",
+            println!(
+                "XXXX JOIN: Adding {:?} peers from the fanout for topic: {:?}",
                 add_peers, topic_hash
             );
             added_peers.extend_from_slice(&peers[..add_peers]);
@@ -368,8 +369,8 @@ impl Gossipsub {
             );
             added_peers.extend_from_slice(&new_peers);
             // add them to the mesh
-            debug!(
-                "JOIN: Inserting {:?} random peers into the mesh",
+            println!(
+                "XXXX JOIN: Inserting {:?} random peers into the mesh",
                 new_peers.len()
             );
             let mesh_peers = self
@@ -381,7 +382,7 @@ impl Gossipsub {
 
         for peer_id in added_peers {
             // Send a GRAFT control message
-            info!("JOIN: Sending Graft message to peer: {:?}", peer_id);
+            println!("XXXX JOIN: Sending Graft message to peer: {:?}", peer_id);
             Self::control_pool_add(
                 &mut self.control_pool,
                 peer_id.clone(),
@@ -390,7 +391,7 @@ impl Gossipsub {
                 },
             );
         }
-        debug!("Completed JOIN for topic: {:?}", topic_hash);
+        println!("XXXX Completed JOIN for topic: {:?}", topic_hash);
     }
 
     /// Gossipsub LEAVE(topic) - Notifies mesh\[topic\] peers with PRUNE messages.
