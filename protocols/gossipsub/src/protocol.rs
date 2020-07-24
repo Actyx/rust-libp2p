@@ -292,8 +292,14 @@ impl Decoder for GossipsubCodec {
             Some(p) => p,
             None => return Ok(None),
         };
+        let rpc = rpc_proto::Rpc::decode(&packet[..]).map_err(|e| {
+            warn!("unable to decode {}", hex_fmt::HexFmt(&packet));
+            e
+        })?;
 
-        let rpc = rpc_proto::Rpc::decode(&packet[..])?;
+        fn parse_messageid_safe(bytes: Vec<u8>) -> Option<MessageId> {
+            Some(MessageId(bytes))
+        }
 
         let mut messages = Vec::with_capacity(rpc.publish.len());
         for message in rpc.publish.into_iter() {
@@ -351,7 +357,7 @@ impl Decoder for GossipsubCodec {
                     message_ids: ihave
                         .message_ids
                         .into_iter()
-                        .map(|x| MessageId(x))
+                        .filter_map(parse_messageid_safe)
                         .collect::<Vec<_>>(),
                 })
                 .collect();
@@ -363,7 +369,7 @@ impl Decoder for GossipsubCodec {
                     message_ids: iwant
                         .message_ids
                         .into_iter()
-                        .map(|x| MessageId(x))
+                        .filter_map(parse_messageid_safe)
                         .collect::<Vec<_>>(),
                 })
                 .collect();
@@ -410,20 +416,20 @@ impl Decoder for GossipsubCodec {
 }
 
 /// A type for gossipsub message ids.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct MessageId(pub String);
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct MessageId(pub Vec<u8>);
 
 impl std::fmt::Display for MessageId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "{:?}", self.0)
     }
 }
 
-impl Into<String> for MessageId {
-    fn into(self) -> String {
-        self.0.into()
-    }
-}
+// impl Into<String> for MessageId {
+//     fn into(self) -> String {
+//         self.0.into()
+//     }
+// }
 
 /// A message received by the gossipsub system.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

@@ -680,7 +680,7 @@ mod tests {
         let (mut gs, peers, _) = build_and_inject_nodes(20, Vec::new(), true);
 
         let events_before = gs.events.len();
-        gs.handle_iwant(&peers[7], vec![MessageId(String::from("unknown id"))]);
+        gs.handle_iwant(&peers[7], vec![MessageId(String::from("unknown id").as_bytes().to_vec())]);
         let events_after = gs.events.len();
 
         assert_eq!(
@@ -699,7 +699,7 @@ mod tests {
             &peers[7],
             vec![(
                 topic_hashes[0].clone(),
-                vec![MessageId(String::from("unknown id"))],
+                vec![MessageId(String::from("unknown id").as_bytes().to_vec())],
             )],
         );
 
@@ -708,7 +708,7 @@ mod tests {
             Some(controls) => controls.iter().any(|c| match c {
                 GossipsubControlAction::IWant { message_ids } => message_ids
                     .iter()
-                    .any(|m| *m.0 == String::from("unknown id")),
+                    .any(|m| *m.0 == *String::from("unknown id").as_bytes()),
                 _ => false,
             }),
             _ => false,
@@ -727,7 +727,7 @@ mod tests {
         let (mut gs, peers, topic_hashes) =
             build_and_inject_nodes(20, vec![String::from("topic1")], true);
 
-        let msg_id = MessageId(String::from("known id"));
+        let msg_id = MessageId(String::from("known id").as_bytes().to_vec());
 
         let events_before = gs.events.len();
         gs.handle_ihave(&peers[7], vec![(topic_hashes[0].clone(), vec![msg_id])]);
@@ -750,7 +750,7 @@ mod tests {
             &peers[7],
             vec![(
                 TopicHash::from_raw(String::from("unsubscribed topic")),
-                vec![MessageId(String::from("irrelevant id"))],
+                vec![MessageId(String::from("irrelevant id").as_bytes().to_vec())],
             )],
         );
         let events_after = gs.events.len();
