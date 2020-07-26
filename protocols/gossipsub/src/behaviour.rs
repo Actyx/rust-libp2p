@@ -45,9 +45,10 @@ use std::{
     collections::VecDeque,
     iter,
     sync::Arc,
-    task::{Context, Poll},
+    task::{Context, Poll}, hash::Hash,
 };
 use wasm_timer::{Instant, Interval};
+use contracts::test_invariant;
 
 mod tests;
 
@@ -91,6 +92,10 @@ pub struct Gossipsub {
     heartbeat: Interval,
 }
 
+// public api - before and after each of these methods, we want to check the invariants
+#[test_invariant(self.peer_topics_valid())]
+#[test_invariant(self.no_own_peer())]
+#[test_invariant(self.fanout_consistent())]
 impl Gossipsub {
     /// Creates a `Gossipsub` struct given a set of parameters specified by `gs_config`.
     pub fn new(local_peer_id: PeerId, gs_config: GossipsubConfig) -> Self {
@@ -322,7 +327,38 @@ impl Gossipsub {
         self.forward_msg(message, propagation_source);
         true
     }
+}
 
+// invariants
+#[cfg(test)]
+impl Gossipsub {
+
+    /// check that peer_topics and peer_topics are the inverse of each other
+    fn peer_topics_valid(&self) -> bool {
+        fn contains_inverse<K: Eq + Hash,V: Eq + Hash>(a: &HashMap<K, Vec<V>>, ainv: &HashMap<V, Vec<K>>) -> bool {
+            a.iter().all(|(k, vs)|
+                vs.iter().all(|v|
+                    ainv.get(v).map(|x| x.contains(k)).unwrap_or_default()
+                )
+            )
+        }
+        contains_inverse(&self.peer_topics, &self.topic_peers) &&
+        contains_inverse(&self.topic_peers, &self.peer_topics)
+    }
+
+    /// check that we don't track our own peer id in the remote peer id maps
+    fn no_own_peer(&self) -> bool {
+        !self.peer_topics.contains_key(&self.local_peer_id) &&
+        !self.control_pool.contains_key(&self.local_peer_id)
+    }
+
+    /// check that the fanout_last_pub map is consistent with the fanout map
+    fn fanout_consistent(&self) -> bool {
+        self.fanout_last_pub.keys().all(|key| self.fanout.contains_key(key))
+    }
+}
+
+impl Gossipsub {
     /// Gossipsub JOIN(topic) - adds topic peers to mesh and sends them GRAFT messages.
     fn join(&mut self, topic_hash: &TopicHash) {
         debug!("Running JOIN for topic: {:?}", topic_hash);
